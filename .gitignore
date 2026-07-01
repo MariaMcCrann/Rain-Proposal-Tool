@@ -1,0 +1,19 @@
+# Ignore Python virtual environments
+venv/
+.venv/
+Rain-Proposal-Tool/venv/
+Rain-Proposal-Tool/.venv/
+
+# Ignore Node modules and build artifacts inside the subproject
+Rain-Proposal-Tool/node_modules/
+Rain-Proposal-Tool/node_modules_1/
+
+# Python cache and compiled files
+__pycache__/
+*.pyc
+
+# OS files
+.DS_Store
+
+# Ignore nested git directory (if any remain)
+Rain-Proposal-Tool/.git
