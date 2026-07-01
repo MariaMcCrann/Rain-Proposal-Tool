@@ -17,3 +17,7 @@ __pycache__/
 
 # Ignore nested git directory (if any remain)
 Rain-Proposal-Tool/.git
+
+# Ignore environment variables
+.env
+.env.local
