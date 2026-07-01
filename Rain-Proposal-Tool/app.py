@@ -4,18 +4,19 @@ Then open: http://localhost:5000
 
 Requires ANTHROPIC_API_KEY set in the environment (extract_rfq.py uses it).
 
-This is the standalone version we agreed on - no Outlook, no SharePoint, no
-Quotient API calls. It does exactly three things:
+It does exactly three things:
   1. Extract text from the uploaded RFQ (PDF/Word/txt)
   2. Run the JSON extraction (extract_rfq.py)
   3. Fill task descriptions into a copy of the fee template (fill_fee_template.py)
-     and show a rough fee estimate as TEXT ONLY, never written into the file
+     and show a rough fee estimate 
 
 Nothing gets sent anywhere. The only output is a page you read and a file
 you download.
 """
 
 import os
+from dotenv import load_dotenv
+load_dotenv()
 import uuid
 import traceback
 from flask import Flask, request, render_template, send_file
