@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>RAIN Proposal Drafter</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body>
+
+  <!-- Processing overlay -->
+  <div class="processing-overlay" id="processingOverlay">
+    <div class="spinner"></div>
+    <div class="processing-label" id="processingLabel">Analysing RFQ…</div>
+    <div class="processing-sub" id="processingSub">Please don't refresh the page.</div>
+  </div>
+
+  <!-- Header -->
+  <header class="site-header">
+    <a class="logo" href="/">
+      <div class="logo-mark">R</div>
+      <div>
+        <div class="logo-text">RAIN Consulting</div>
+        <div class="logo-sub">Proposal Drafter</div>
+      </div>
+    </a>
+    <span class="header-badge">Internal Tool</span>
+  </header>
+
+  <main class="shell">
+    <div class="page-head">
+      <h1 class="page-title">New Proposal</h1>
+      <p class="subtitle">Upload an RFQ and choose how much to generate. Nothing is sent anywhere — all output stays local.</p>
+    </div>
+
+    {% if error %}
+    <div class="notice notice-error">
+      <strong>Couldn't process that.</strong>
+      <p style="margin-top:6px;">{{ error }}</p>
+    </div>
+    {% endif %}
+
+    <form action="/process" method="post" enctype="multipart/form-data" class="upload-card" id="uploadForm">
+
+      <!-- File upload -->
+      <div>
+        <p class="section-label">RFQ Document</p>
+        <div class="upload-drop" id="dropZone">
+          <button type="button" id="addFileBtn" class="btn-add">＋ Add file</button>
+          <span class="upload-drop-hint">PDF, Word (.docx), or .txt. Add multiple files if needed — each click adds another. Scanned PDFs not supported yet.</span>
+          <ul id="fileList" class="file-list"></ul>
+        </div>
+        <input type="file" id="filePicker" accept=".pdf,.docx,.txt" hidden />
+        <input type="file" id="rfq_file" name="rfq_file" multiple hidden required />
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- Mode selector -->
+      <div class="mode-selector">
+        <p class="section-label">Analysis Mode</p>
+        <div class="mode-grid">
+
+          <label class="mode-option">
+            <input type="radio" name="mode" value="quick" id="modeQuick" checked />
+            <div class="mode-card">
+              <div class="mode-icon">⚡</div>
+              <div class="mode-title">Quick Review</div>
+              <div class="mode-desc">Extracts project details, phases, and deliverables. Good for a fast scope check.</div>
+              <div class="mode-time">⏱ ~20–40 seconds</div>
+            </div>
+          </label>
+
+          <label class="mode-option">
+            <input type="radio" name="mode" value="full" id="modeFull" />
+            <div class="mode-card">
+              <div class="mode-icon">📄</div>
+              <div class="mode-title">Full Proposal</div>
+              <div class="mode-desc">Generates complete proposal document, fee template, and optional planning research.</div>
+              <div class="mode-time">⏱ ~1–2 minutes</div>
+            </div>
+          </label>
+
+        </div>
+
+        <!-- Research toggle — only shown for Full mode -->
+        <div id="researchRow" style="display:none;">
+          <label class="toggle-row" style="display:flex;align-items:flex-start;gap:10px;font-size:14px;cursor:pointer;">
+            <input type="checkbox" name="include_research" id="includeResearch" value="1" style="margin-top:3px;flex-shrink:0;" />
+            <span>
+              <strong>Include planning research</strong>
+              <span style="display:block;color:var(--muted);font-size:13px;margin-top:2px;">
+                Searches for traditional owners, council, CMA, planning controls, and existing models. Adds ~30 seconds.
+              </span>
+            </span>
+          </label>
+        </div>
+
+        <!-- Timing notice -->
+        <div class="timing-notice" id="timingNotice">
+          <span>⏳</span>
+          <span id="timingText"><strong>Quick review</strong> may take 20–40 seconds. Please don't refresh the page.</span>
+        </div>
+      </div>
+
+      <button type="submit" class="btn-primary" id="submitBtn" style="align-self:flex-start;padding:13px 28px;font-size:15px;">
+        Run Analysis →
+      </button>
+
+    </form>
+
+    <p class="footnote">Output: task descriptions and phases only — hours and fees stay blank for you to fill in. No email, Quotient, or SharePoint connection.</p>
+  </main>
+
+  <script>
+    const files = [];
+    const picker = document.getElementById('filePicker');
+    const realInput = document.getElementById('rfq_file');
+    const fileListEl = document.getElementById('fileList');
+    const form = document.getElementById('uploadForm');
+    const submitBtn = document.getElementById('submitBtn');
+    const overlay = document.getElementById('processingOverlay');
+    const processingLabel = document.getElementById('processingLabel');
+    const processingSub = document.getElementById('processingSub');
+    const timingNotice = document.getElementById('timingNotice');
+    const timingText = document.getElementById('timingText');
+    const researchRow = document.getElementById('researchRow');
+    const modeQuick = document.getElementById('modeQuick');
+    const modeFull = document.getElementById('modeFull');
+
+    // File picker
+    document.getElementById('addFileBtn').addEventListener('click', () => picker.click());
+    picker.addEventListener('change', () => {
+      for (const f of picker.files) files.push(f);
+      picker.value = '';
+      sync();
+    });
+
+    function sync() {
+      const dt = new DataTransfer();
+      files.forEach(f => dt.items.add(f));
+      realInput.files = dt.files;
+      fileListEl.innerHTML = '';
+      files.forEach((f, i) => {
+        const li = document.createElement('li');
+        const nameSpan = document.createElement('span');
+        nameSpan.textContent = f.name;
+        const rm = document.createElement('button');
+        rm.type = 'button';
+        rm.textContent = 'Remove';
+        rm.className = 'file-remove';
+        rm.addEventListener('click', () => { files.splice(i, 1); sync(); });
+        li.appendChild(nameSpan);
+        li.appendChild(rm);
+        fileListEl.appendChild(li);
+      });
+    }
+
+    // Mode switching
+    function updateMode() {
+      const isFull = modeFull.checked;
+      researchRow.style.display = isFull ? 'block' : 'none';
+      timingNotice.classList.add('visible');
+      if (isFull) {
+        timingText.innerHTML = '<strong>Full proposal</strong> may take 1–2 minutes. Please don\'t refresh the page.';
+      } else {
+        timingText.innerHTML = '<strong>Quick review</strong> may take 20–40 seconds. Please don\'t refresh the page.';
+      }
+    }
+
+    modeQuick.addEventListener('change', updateMode);
+    modeFull.addEventListener('change', updateMode);
+    updateMode(); // init
+
+    // Submit
+    form.addEventListener('submit', e => {
+      if (files.length === 0) {
+        e.preventDefault();
+        alert('Add at least one file first.');
+        return;
+      }
+      const isFull = modeFull.checked;
+      processingLabel.textContent = isFull ? 'Generating full proposal…' : 'Extracting project details…';
+      processingSub.innerHTML = isFull
+        ? 'This may take 1–2 minutes. Please don\'t refresh the page.'
+        : 'Quick review may take 20–40 seconds. Please don\'t refresh the page.';
+      overlay.classList.add('visible');
+      submitBtn.disabled = true;
+    });
+  </script>
+
+</body>
+</html>
