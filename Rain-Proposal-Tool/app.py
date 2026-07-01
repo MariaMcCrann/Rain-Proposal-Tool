@@ -2,24 +2,20 @@
 Run with:  python app.py
 Then open: http://localhost:5000
 
-Requires ANTHROPIC_API_KEY set in the environment (extract_rfq.py uses it).
+Requires ANTHROPIC_API_KEY set in the environment.
 
-It does exactly three things:
-  1. Extract text from the uploaded RFQ (PDF/Word/txt)
-  2. Run the JSON extraction (extract_rfq.py)
-  3. Fill task descriptions into a copy of the fee template (fill_fee_template.py)
-     and show a rough fee estimate 
-
-Nothing gets sent anywhere. The only output is a page you read and a file
-you download.
+Modes:
+  quick  — extract_rfq only → show project details, phases, deliverables. ~20-40s.
+  full   — full pipeline: extract + research (optional) + proposal doc + fee template. ~1-2 min.
 """
 
 import os
-from dotenv import load_dotenv
-load_dotenv()
 import uuid
 import traceback
 from flask import Flask, request, render_template, send_file
+from dotenv import load_dotenv
+
+load_dotenv()  # loads ANTHROPIC_API_KEY (and anything else) from .env
 
 from ingest import extract_text, ScannedPdfError, UnsupportedFileError
 from extract_rfq import extract_rfq
@@ -38,7 +34,7 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 app = Flask(__name__)
-app.config["MAX_CONTENT_LENGTH"] = 20 * 1024 * 1024  # 20MB upload limit
+app.config["MAX_CONTENT_LENGTH"] = 20 * 1024 * 1024  # 20MB
 
 
 @app.route("/", methods=["GET"])
@@ -52,6 +48,7 @@ def process():
     if not uploaded_files:
         return render_template("index.html", error="No file selected.")
 
+    mode = request.form.get("mode", "quick")  # "quick" or "full"
     run_id = uuid.uuid4().hex[:8]
     text_sections = []
     skipped = []
@@ -82,12 +79,30 @@ def process():
     except Exception as e:
         return render_template("index.html", error=f"Extraction failed: {e}")
 
+    warnings = list(skipped)
+
+    # ── QUICK MODE — stop here ──────────────────────────────────────────────
+    if mode == "quick":
+        return render_template(
+            "result.html",
+            extracted=extracted,
+            warnings=warnings,
+            mode="quick",
+            source_files=[f.filename for f in uploaded_files],
+            # unused in quick mode but template expects them
+            estimate_text=None,
+            quotient_url=None,
+            download_filename=None,
+            docx_filename=None,
+            include_research=False,
+        )
+
+    # ── FULL MODE ───────────────────────────────────────────────────────────
     output_filename = f"{run_id}_fee_template.xlsx"
     output_path = os.path.join(OUTPUT_DIR, output_filename)
-    warnings = fill_phased_template(TEMPLATE_XLSX, output_path, extracted)
-    warnings = skipped + warnings
+    fill_warnings = fill_phased_template(TEMPLATE_XLSX, output_path, extracted)
+    warnings += fill_warnings
 
-    # Optional planning research
     include_research = request.form.get("include_research") == "1"
     research = None
     if include_research:
@@ -99,14 +114,12 @@ def process():
         except Exception as e:
             warnings.append(f"Planning research failed: {e}")
 
-    # Generate full proposal content
     sections = {}
     try:
         sections = generate_proposal_content(extracted, research)
     except Exception as e:
         warnings.append(f"Proposal content generation failed: {e}")
 
-    # Build the docx
     docx_filename = f"{run_id}_draft_proposal.docx"
     docx_path = os.path.join(OUTPUT_DIR, docx_filename)
     try:
@@ -128,6 +141,7 @@ def process():
         docx_filename=docx_filename,
         source_files=[f.filename for f in uploaded_files],
         include_research=include_research,
+        mode="full",
     )
 
 
@@ -143,5 +157,5 @@ def download(filename):
 
 if __name__ == "__main__":
     if not os.environ.get("ANTHROPIC_API_KEY"):
-        print("WARNING: ANTHROPIC_API_KEY is not set - extraction will fail until it is.")
+        print("WARNING: ANTHROPIC_API_KEY is not set — extraction will fail until it is.")
     app.run(debug=True, port=5000)

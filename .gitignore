@@ -21,3 +21,7 @@ Rain-Proposal-Tool/.git
 # Ignore environment variables
 .env
 .env.local
+
+# Ignore app-generated files
+Rain-Proposal-Tool/outputs/
+Rain-Proposal-Tool/uploads/
