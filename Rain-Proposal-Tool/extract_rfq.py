@@ -126,7 +126,7 @@ Document(s):
 def extract_rfq(document_text: str) -> dict:
     """Takes raw RFQ text, returns a dict matching EXTRACTION_TOOL's input_schema."""
     response = client.messages.create(
-        model="claude-sonnet-4-6",
+        model=os.environ.get("RAIN_MODEL", "claude-sonnet-4-6"),
         max_tokens=2000,
         tools=[EXTRACTION_TOOL],
         tool_choice={"type": "tool", "name": "extract_rfq"},
