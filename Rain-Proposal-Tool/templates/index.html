@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>RAIN Proposal Drafter</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body>
+  <main class="shell">
+    <header class="page-head">
+      <p class="eyebrow">Rain Consulting · Internal Tool</p>
+      <h1>Proposal Drafter</h1>
+      <p class="subtitle">Upload an RFQ. Get task descriptions and a rough fee estimate. Nothing is sent anywhere — review and finish manually.</p>
+    </header>
+
+    {% if error %}
+    <div class="notice notice-error">
+      <strong>Couldn't process that.</strong>
+      <p>{{ error }}</p>
+    </div>
+    {% endif %}
+
+    <form action="/process" method="post" enctype="multipart/form-data" class="upload-card" id="uploadForm">
+      <div class="upload-drop">
+        <button type="button" id="addFileBtn" class="btn-secondary">+ Add file</button>
+        <span class="upload-drop-hint">Add files one at a time — each click adds another, it doesn't replace. PDF, Word, or .txt. Scanned PDFs aren't supported yet.</span>
+        <ul id="fileList" class="file-list"></ul>
+      </div>
+      <input type="file" id="filePicker" accept=".pdf,.docx,.txt" hidden />
+      <input type="file" id="rfq_file" name="rfq_file" multiple hidden required />
+      <label class="toggle-row research-toggle">
+        <input type="checkbox" name="include_research" id="includeResearch" value="1" />
+        <span>
+          <strong>Include planning research</strong>
+          <span class="toggle-hint">Searches for traditional owners, council, CMA, planning controls, and existing models. Adds ~30 seconds and a small API cost.</span>
+        </span>
+      </label>
+      <button type="submit" class="btn-primary">Process</button>
+    </form>
+
+    <script>
+      const files = [];
+      const picker = document.getElementById('filePicker');
+      const realInput = document.getElementById('rfq_file');
+      const fileListEl = document.getElementById('fileList');
+      const form = document.getElementById('uploadForm');
+
+      document.getElementById('addFileBtn').addEventListener('click', () => picker.click());
+
+      picker.addEventListener('change', () => {
+        for (const f of picker.files) files.push(f);
+        picker.value = '';
+        sync();
+      });
+
+      function sync() {
+        const dt = new DataTransfer();
+        files.forEach((f) => dt.items.add(f));
+        realInput.files = dt.files;
+        fileListEl.innerHTML = '';
+        files.forEach((f, i) => {
+          const li = document.createElement('li');
+          const nameSpan = document.createElement('span');
+          nameSpan.textContent = f.name;
+          const rm = document.createElement('button');
+          rm.type = 'button';
+          rm.textContent = 'Remove';
+          rm.className = 'file-remove';
+          rm.addEventListener('click', () => { files.splice(i, 1); sync(); });
+          li.appendChild(nameSpan);
+          li.appendChild(rm);
+          fileListEl.appendChild(li);
+        });
+      }
+
+      form.addEventListener('submit', (e) => {
+        if (files.length === 0) {
+          e.preventDefault();
+          alert('Add at least one file first.');
+        }
+      });
+    </script>
+
+    <p class="footnote">Output: task descriptions only — hours and fees stay blank for you to fill in. No email, no Quotient, no SharePoint yet.</p>
+  </main>
+</body>
+</html>

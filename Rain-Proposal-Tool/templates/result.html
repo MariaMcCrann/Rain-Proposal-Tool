@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>RAIN Proposal Drafter — Result</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body>
+  <main class="shell">
+    <header class="page-head">
+      <p class="eyebrow">Rain Consulting · Internal Tool</p>
+      <h1>{{ extracted.project_title or "Untitled project" }}</h1>
+      <p class="subtitle">{{ extracted.project_type }}</p>
+      {% if source_files %}
+      <p class="subtitle muted">From: {{ source_files|join(", ") }}</p>
+      {% endif %}
+    </header>
+
+    {% if warnings %}
+    <div class="notice notice-warning">
+      <strong>Check before relying on this:</strong>
+      <ul>
+        {% for w in warnings %}<li>{{ w }}</li>{% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+
+    {% if extracted.extraction_notes %}
+    <div class="notice notice-warning">
+      <strong>Extraction notes — check before relying on this:</strong>
+      <ul>
+        {% for note in extracted.extraction_notes %}<li>{{ note }}</li>{% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+
+    <section class="card">
+      <h2>Background</h2>
+      <p>{{ extracted.background or "Not stated in the RFQ." }}</p>
+    </section>
+
+    <section class="card">
+      <h2>Phases and deliverables</h2>
+      {% for phase in extracted.phases %}
+      <h3 class="phase-heading">{{ phase.phase_name }}</h3>
+      <ol class="deliverables">
+        {% for d in phase.deliverables %}<li>{{ d }}</li>{% endfor %}
+      </ol>
+      {% endfor %}
+    </section>
+
+    <section class="card">
+      <h2>Authority / standards requirements</h2>
+      {% if extracted.authority_requirements %}
+      <ul class="deliverables">
+        {% for a in extracted.authority_requirements %}<li>{{ a }}</li>{% endfor %}
+      </ul>
+      {% else %}
+      <p class="muted">None stated in the RFQ.</p>
+      {% endif %}
+    </section>
+
+    <section class="card">
+      <h2>Site / location</h2>
+      <p>{{ extracted.site_address or "Not stated in the RFQ." }}</p>
+    </section>
+
+    <section class="card">
+      <h2>Contact</h2>
+      <dl class="contact-grid">
+        <div><dt>Name</dt><dd>{{ extracted.contact.name or "—" }}</dd></div>
+        <div><dt>Company</dt><dd>{{ extracted.contact.company or "—" }}</dd></div>
+        <div><dt>Email</dt><dd>{{ extracted.contact.email or "—" }}</dd></div>
+        <div><dt>Phone</dt><dd>{{ extracted.contact.phone or "—" }}</dd></div>
+      </dl>
+    </section>
+
+    <section class="card card-estimate">
+      <h2>Rough fee estimate</h2>
+      <pre class="estimate-text">{{ estimate_text }}</pre>
+      <p class="muted">This is a planning aid only — it is not written into the spreadsheet and is not a quote.</p>
+    </section>
+
+    <section class="card card-actions">
+      <h2>Next steps</h2>
+      <a class="btn-primary" href="/download/{{ download_filename }}">Download fee template (tasks filled, hours blank)</a>
+      {% if docx_filename %}
+      <a class="btn-secondary" href="/download/{{ docx_filename }}">Download draft proposal document (.docx)</a>
+      {% endif %}
+      <a class="btn-secondary" href="{{ quotient_url }}" target="_blank" rel="noopener">Start quote in Quotient (placeholder link — params unconfirmed)</a>
+      <a class="btn-tertiary" href="/">Process another RFQ</a>
+    </section>
+  </main>
+</body>
+</html>
