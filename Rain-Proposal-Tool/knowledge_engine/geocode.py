@@ -9,6 +9,7 @@ def geocode_address(address: str) -> dict:
             "address": None,
             "lat": None,
             "lon": None,
+            "council": None,
             "source": "No address provided"
         }
 
@@ -33,8 +34,14 @@ def geocode_address(address: str) -> dict:
     if not results:
         return {
             "address": address,
+            "formatted_address": None,
             "lat": None,
             "lon": None,
+            "suburb": None,
+            "postcode": None,
+            "council": None,
+            "state": "VIC",
+            "country": "Australia",
             "source": "Nominatim - no match found"
         }
 

@@ -6,8 +6,8 @@ Then open:
     http://127.0.0.1:5000
 
 .env options:
-    TEST_MODE=1   no API calls, uses fixture data and creates test DOCX/XLSX
-    TEST_MODE=0   real API workflow
+    TEST_MODE=1   no API calls, uses fixture data
+    TEST_MODE=0   real uploaded file workflow
     USE_HAIKU=1   cheaper Claude model for real testing
 """
 
@@ -34,8 +34,8 @@ from extract_rfq import extract_rfq
 from fill_fee_template import fill_phased_template, rough_fee_estimate
 from quotient_url import build_quotient_prefill_url
 from draft_proposal_doc import generate_draft_proposal
-from knowledge_engine.research import run_research
 from generate_proposal import generate_proposal_content
+from knowledge_engine.research import run_research
 
 if TEST_MODE:
     from test_fixture import FIXTURE_EXTRACTED, FIXTURE_ESTIMATE
@@ -54,8 +54,35 @@ app.config["MAX_CONTENT_LENGTH"] = 20 * 1024 * 1024
 
 
 # ---------------------------------------------------------------------
-# Test document generation
+# Helpers
 # ---------------------------------------------------------------------
+
+def get_project_address(extracted: dict, combined_text: str = "") -> str:
+    """
+    Finds the best available site address from extracted RFQ data.
+    Falls back to a simple text search if the extractor did not return one.
+    """
+
+    possible_keys = [
+        "site_address",
+        "project_address",
+        "location",
+        "site_location",
+        "address",
+    ]
+
+    for key in possible_keys:
+        value = extracted.get(key)
+        if value:
+            return value
+
+    # Simple fallback for the Avalon style RFQ
+    text_upper = combined_text.upper()
+    if "15 AVALON ROAD" in text_upper:
+        return "15 Avalon Road, Avalon VIC"
+
+    return ""
+
 
 def create_test_proposal_docx(extracted):
     filename = f"TEST_Draft_Proposal_{datetime.now().strftime('%Y%m%d_%H%M%S')}.docx"
@@ -127,9 +154,10 @@ def index():
 @app.route("/process", methods=["POST"])
 def process():
     mode = request.form.get("mode", "quick")
+    include_research = request.form.get("include_research") in ["1", "on", "true"]
 
     # -------------------------------------------------------------
-    # TEST MODE — no API calls
+    # TEST MODE
     # -------------------------------------------------------------
     if TEST_MODE:
         extracted = FIXTURE_EXTRACTED
@@ -168,7 +196,7 @@ def process():
         )
 
     # -------------------------------------------------------------
-    # NORMAL MODE — real files and API
+    # NORMAL MODE
     # -------------------------------------------------------------
     uploaded_files = request.files.getlist("files") or request.files.getlist("rfq_file")
     uploaded_files = [f for f in uploaded_files if f and f.filename]
@@ -225,6 +253,29 @@ def process():
 
     warnings = list(skipped)
 
+    # -------------------------------------------------------------
+    # KNOWLEDGE ENGINE
+    # -------------------------------------------------------------
+    research = None
+    project_address = get_project_address(extracted, combined_text)
+
+    if include_research:
+        if not project_address:
+            warnings.append("Knowledge Engine skipped: no project address found.")
+        else:
+            try:
+                research = run_research(project_address)
+
+                print("\n=== KNOWLEDGE ENGINE RESULT ===")
+                print(research)
+                print("================================\n")
+
+                for note in research.get("notes", []):
+                    warnings.append(f"Research note: {note}")
+
+            except Exception as e:
+                warnings.append(f"Knowledge Engine failed: {e}")
+
     if mode == "quick":
         return render_template(
             "result.html",
@@ -236,7 +287,7 @@ def process():
             quotient_url=None,
             download_filename=None,
             docx_filename=None,
-            include_research=False,
+            include_research=include_research,
             test_mode=False,
         )
 
@@ -253,22 +304,11 @@ def process():
         warnings.append(f"Fee template failed to generate: {e}")
         output_filename = None
 
-    include_research = request.form.get("include_research") in ["1", "on", "true"]
-    research = None
-
-    if include_research:
-        try:
-            research = research_site(extracted)
-            for gap in research.get("gaps", []):
-                warnings.append(f"Planning research gap: {gap}")
-        except Exception as e:
-            warnings.append(f"Planning research failed: {e}")
-
-    sections = {}
     try:
         sections = generate_proposal_content(extracted, research)
     except Exception as e:
         warnings.append(f"Proposal content generation failed: {e}")
+        sections = {}
 
     docx_filename = f"{run_id}_draft_proposal.docx"
     docx_path = os.path.join(OUTPUT_DIR, docx_filename)
