@@ -203,12 +203,15 @@ def process():
 
 @app.route("/download/<filename>")
 def download(filename):
-    path = os.path.join(OUTPUT_DIR, filename)
-    if filename.endswith(".docx"):
-        download_name = "Rain_Draft_Proposal.docx"
-    else:
-        download_name = "Rain_Project_Fee_Tracker.xlsx"
-    return send_file(path, as_attachment=True, download_name=download_name)
+    if not filename or filename == "None":
+        return "No file was generated for download.", 404
+
+    path = os.path.join(OUTPUT_FOLDER, filename)
+
+    if not os.path.exists(path):
+        return f"File not found: {filename}", 404
+
+    return send_file(path, as_attachment=True, download_name=filename)
 
 
 if __name__ == "__main__":
