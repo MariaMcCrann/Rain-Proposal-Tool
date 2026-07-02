@@ -198,8 +198,13 @@ def process():
     # -------------------------------------------------------------
     # NORMAL MODE
     # -------------------------------------------------------------
-    uploaded_files = request.files.getlist("files") or request.files.getlist("rfq_file")
+    uploaded_files = []
+
+    for key in request.files:
+    uploaded_files.extend(request.files.getlist(key))
+
     uploaded_files = [f for f in uploaded_files if f and f.filename]
+
 
     if not uploaded_files:
         return render_template(
