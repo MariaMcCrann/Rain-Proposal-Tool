@@ -100,7 +100,7 @@
         <p>⏳ Quick review may take 20–40 seconds. Please don't refresh the page.</p>
 
         <label class="checkbox-row">
-          <input type="checkbox" name="planning_research">
+          <input type="checkbox" name="include_research" value="1">
           <span>
             <strong>Include planning research</strong><br>
             Searches for traditional owners, council, CMA, planning controls and existing models.
@@ -125,75 +125,27 @@
   const fileSummary = document.getElementById("file-summary");
   const fileList = document.getElementById("file-list");
 
-  let selectedFiles = [];
-
-  function refreshInputFiles() {
-    const dataTransfer = new DataTransfer();
-
-    selectedFiles.forEach(file => {
-      dataTransfer.items.add(file);
-    });
-
-    fileInput.files = dataTransfer.files;
-  }
-
   function updateFileList() {
     fileList.innerHTML = "";
 
-    if (selectedFiles.length === 0) {
+    const files = Array.from(fileInput.files);
+
+    if (files.length === 0) {
       fileSummary.textContent = "No file selected yet";
       return;
     }
 
     fileSummary.textContent =
-      selectedFiles.length === 1
-        ? selectedFiles[0].name
-        : `${selectedFiles.length} files selected`;
+      files.length === 1 ? files[0].name : `${files.length} files selected`;
 
-    selectedFiles.forEach((file, index) => {
+    files.forEach(file => {
       const li = document.createElement("li");
-
-      li.innerHTML = `
-        <span>✓ ${file.name}</span>
-        <button type="button" class="remove-file" data-index="${index}">
-          Remove
-        </button>
-      `;
-
+      li.innerHTML = `<span>✓ ${file.name}</span>`;
       fileList.appendChild(li);
     });
-
-    document.querySelectorAll(".remove-file").forEach(button => {
-      button.addEventListener("click", function () {
-        const index = Number(this.dataset.index);
-        selectedFiles.splice(index, 1);
-        refreshInputFiles();
-        updateFileList();
-      });
-    });
   }
 
-  function addFiles(files) {
-    Array.from(files).forEach(file => {
-      const alreadyAdded = selectedFiles.some(existing =>
-        existing.name === file.name &&
-        existing.size === file.size &&
-        existing.lastModified === file.lastModified
-      );
-
-      if (!alreadyAdded) {
-        selectedFiles.push(file);
-      }
-    });
-
-    refreshInputFiles();
-    updateFileList();
-  }
-
-  fileInput.addEventListener("change", () => {
-    addFiles(fileInput.files);
-    fileInput.value = "";
-  });
+  fileInput.addEventListener("change", updateFileList);
 
   dropzone.addEventListener("dragover", event => {
     event.preventDefault();
@@ -207,7 +159,15 @@
   dropzone.addEventListener("drop", event => {
     event.preventDefault();
     dropzone.classList.remove("dragover");
-    addFiles(event.dataTransfer.files);
+
+    const dataTransfer = new DataTransfer();
+
+    Array.from(event.dataTransfer.files).forEach(file => {
+      dataTransfer.items.add(file);
+    });
+
+    fileInput.files = dataTransfer.files;
+    updateFileList();
   });
 </script>
 
