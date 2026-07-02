@@ -1,4 +1,5 @@
 import os
+import re
 import uuid
 import traceback
 from datetime import datetime
@@ -18,10 +19,6 @@ from knowledge_engine.proposal_writer import write_proposal_sections
 from knowledge_engine.research import run_research
 
 
-# -------------------------------------------------------------
-# Setup
-# -------------------------------------------------------------
-
 load_dotenv()
 
 TEST_MODE = os.environ.get("TEST_MODE", "0") == "1"
@@ -37,14 +34,16 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 20 * 1024 * 1024
 
-
 if TEST_MODE:
     from test_fixture import FIXTURE_EXTRACTED, FIXTURE_ESTIMATE
 
 
-# -------------------------------------------------------------
-# Helpers
-# -------------------------------------------------------------
+def safe_filename_part(value: str, fallback: str) -> str:
+    value = (value or "").strip() or fallback
+    value = re.sub(r"[^A-Za-z0-9_\-]+", "_", value)
+    value = re.sub(r"_+", "_", value).strip("_")
+    return value or fallback
+
 
 def get_uploaded_files():
     uploaded_files = []
@@ -55,13 +54,18 @@ def get_uploaded_files():
     return [file for file in uploaded_files if file and file.filename]
 
 
+def add_user_fields(extracted: dict, project_number: str, proposal_number: str) -> dict:
+    extracted["project_number"] = project_number
+    extracted["proposal_number"] = proposal_number
+    return extracted
+
+
 def create_test_proposal_docx(extracted):
     filename = f"TEST_Draft_Proposal_{datetime.now().strftime('%Y%m%d_%H%M%S')}.docx"
     path = os.path.join(OUTPUT_DIR, filename)
 
     doc = Document()
     doc.add_heading("Draft Proposal", level=1)
-
     doc.add_heading(extracted.get("project_title", "Untitled Project"), level=2)
     doc.add_paragraph(extracted.get("background", "No background provided."))
 
@@ -78,8 +82,8 @@ def create_test_proposal_docx(extracted):
     return filename
 
 
-def create_test_fee_template(extracted):
-    filename = f"TEST_Fee_Template_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+def create_test_fee_template(extracted, file_prefix):
+    filename = f"{file_prefix}_fee_template.xlsx"
     path = os.path.join(OUTPUT_DIR, filename)
 
     wb = Workbook()
@@ -89,11 +93,13 @@ def create_test_fee_template(extracted):
     ws["A1"] = "RAIN Consulting - Test Fee Template"
     ws["A3"] = "Project"
     ws["B3"] = extracted.get("project_title", "Untitled Project")
-    ws["A5"] = "Phase"
-    ws["B5"] = "Hours"
-    ws["C5"] = "Fee"
+    ws["A4"] = "Project Number"
+    ws["B4"] = extracted.get("project_number", "")
+    ws["A6"] = "Phase"
+    ws["B6"] = "Hours"
+    ws["C6"] = "Fee"
 
-    row = 6
+    row = 7
     for phase in extracted.get("phases", []):
         ws[f"A{row}"] = phase.get("phase_name", "Unnamed phase")
         row += 1
@@ -101,10 +107,6 @@ def create_test_fee_template(extracted):
     wb.save(path)
     return filename
 
-
-# -------------------------------------------------------------
-# Routes
-# -------------------------------------------------------------
 
 @app.route("/", methods=["GET"])
 def index():
@@ -120,11 +122,14 @@ def process():
     mode = request.form.get("mode", "quick")
     include_research = request.form.get("include_research") in ["1", "on", "true"]
 
-    # ---------------------------------------------------------
-    # Test mode
-    # ---------------------------------------------------------
+    project_number = request.form.get("project_number", "").strip()
+    proposal_number = request.form.get("proposal_number", "").strip()
+
+    run_id = uuid.uuid4().hex[:8]
+    file_prefix = safe_filename_part(project_number, run_id)
+
     if TEST_MODE:
-        extracted = FIXTURE_EXTRACTED
+        extracted = add_user_fields(FIXTURE_EXTRACTED.copy(), project_number, proposal_number)
         warnings = ["⚠️ TEST MODE — this is fixture data, not a real extraction."]
 
         if mode == "quick":
@@ -143,7 +148,7 @@ def process():
             )
 
         docx_filename = create_test_proposal_docx(extracted)
-        download_filename = create_test_fee_template(extracted)
+        download_filename = create_test_fee_template(extracted, file_prefix)
 
         return render_template(
             "result.html",
@@ -159,9 +164,6 @@ def process():
             test_mode=True,
         )
 
-    # ---------------------------------------------------------
-    # Local mode — no API
-    # ---------------------------------------------------------
     uploaded_files = get_uploaded_files()
 
     if not uploaded_files:
@@ -172,7 +174,6 @@ def process():
             use_haiku=False,
         )
 
-    run_id = uuid.uuid4().hex[:8]
     text_sections = []
     skipped = []
 
@@ -208,6 +209,7 @@ def process():
 
     try:
         extracted = extract_rfq_data(combined_text)
+        extracted = add_user_fields(extracted, project_number, proposal_number)
     except Exception as e:
         return render_template(
             "index.html",
@@ -219,9 +221,6 @@ def process():
     warnings = list(skipped)
     research = None
 
-    # ---------------------------------------------------------
-    # Knowledge Engine
-    # ---------------------------------------------------------
     if include_research:
         project_address = (
             extracted.get("site_address")
@@ -246,9 +245,6 @@ def process():
             except Exception as e:
                 warnings.append(f"Knowledge Engine failed: {e}")
 
-    # ---------------------------------------------------------
-    # Quick mode
-    # ---------------------------------------------------------
     if mode == "quick":
         return render_template(
             "result.html",
@@ -264,10 +260,7 @@ def process():
             test_mode=False,
         )
 
-    # ---------------------------------------------------------
-    # Full proposal mode
-    # ---------------------------------------------------------
-    output_filename = f"{run_id}_fee_template.xlsx"
+    output_filename = f"{file_prefix}_fee_template.xlsx"
     output_path = os.path.join(OUTPUT_DIR, output_filename)
 
     try:
@@ -283,7 +276,7 @@ def process():
         warnings.append(f"Local proposal writing failed: {e}")
         sections = {}
 
-    docx_filename = f"{run_id}_draft_proposal.docx"
+    docx_filename = f"{file_prefix}_draft_proposal.docx"
     docx_path = os.path.join(OUTPUT_DIR, docx_filename)
 
     try:
@@ -329,10 +322,6 @@ def download(filename):
 
     return send_file(path, as_attachment=True, download_name=filename)
 
-
-# -------------------------------------------------------------
-# Run
-# -------------------------------------------------------------
 
 if __name__ == "__main__":
     if TEST_MODE:

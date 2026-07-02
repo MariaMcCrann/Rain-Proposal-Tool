@@ -23,7 +23,7 @@
   <section class="hero">
     <div class="eyebrow">RAIN CONSULTING · INTERNAL TOOL</div>
     <h1>New Proposal</h1>
-    <p>Upload an RFQ and choose how much to generate. Nothing is sent anywhere — all output stays local.</p>
+    <p>Upload an RFQ, add the project number, and generate a draft proposal package locally.</p>
   </section>
 
   {% if error %}
@@ -37,7 +37,35 @@
 
     <section class="step">
       <div class="step-number">1</div>
+      <div class="step-content">
+        <h2>Project details</h2>
 
+        <label class="field-label">
+          Project number
+          <input
+            type="text"
+            name="project_number"
+            placeholder="e.g. 716_01"
+            class="text-input"
+          >
+        </label>
+
+        <label class="field-label">
+          Proposal number
+          <input
+            type="text"
+            name="proposal_number"
+            placeholder="e.g. 900581"
+            class="text-input"
+          >
+        </label>
+      </div>
+    </section>
+
+    <hr>
+
+    <section class="step">
+      <div class="step-number">2</div>
       <div class="step-content">
         <h2>Upload RFQ</h2>
         <p>PDF, Word (.docx), or .txt. You can add multiple files.</p>
@@ -62,11 +90,10 @@
     <hr>
 
     <section class="step">
-      <div class="step-number">2</div>
-
+      <div class="step-number">3</div>
       <div class="step-content">
         <h2>Choose mode</h2>
-        <p>Quick is good for checking scope. Full generates a complete draft.</p>
+        <p>Quick is good for checking scope. Full generates a Word proposal and fee spreadsheet.</p>
 
         <div class="mode-grid">
           <label class="mode-card">
@@ -93,17 +120,15 @@
     <hr>
 
     <section class="step">
-      <div class="step-number">3</div>
-
+      <div class="step-number">4</div>
       <div class="step-content">
         <h2>Run analysis</h2>
-        <p>⏳ Quick review may take 20–40 seconds. Please don't refresh the page.</p>
 
         <label class="checkbox-row">
           <input type="checkbox" name="include_research" value="1">
           <span>
             <strong>Include planning research</strong><br>
-            Searches for traditional owners, council, CMA, planning controls and existing models.
+            Checks coordinates, authorities and preliminary planning controls.
           </span>
         </label>
 
@@ -114,8 +139,7 @@
   </form>
 
   <div class="note">
-    🔒 Hours and fees stay blank for you to fill in.<br>
-    No email, Quotient, or SharePoint connection.
+    🔒 This tool runs locally. Hours and fees stay blank for review.
   </div>
 </main>
 

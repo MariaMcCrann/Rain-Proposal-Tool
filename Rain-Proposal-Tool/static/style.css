@@ -477,3 +477,18 @@ button:hover {
   border-top: 1px solid var(--border);
   margin: 8px 0;
 }
+.field-label {
+  display: block;
+  font-weight: 700;
+  margin-bottom: 18px;
+}
+
+.text-input {
+  width: 100%;
+  max-width: 260px;
+  padding: 12px 14px;
+  margin-top: 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  font-size: 15px;
+}
