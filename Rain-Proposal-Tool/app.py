@@ -34,7 +34,7 @@ from extract_rfq import extract_rfq
 from fill_fee_template import fill_phased_template, rough_fee_estimate
 from quotient_url import build_quotient_prefill_url
 from draft_proposal_doc import generate_draft_proposal
-from research_site import research_site
+from knowledge_engine.research import run_research
 from generate_proposal import generate_proposal_content
 
 if TEST_MODE:
