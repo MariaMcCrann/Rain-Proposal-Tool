@@ -1,28 +1,27 @@
 """
-Run with:  python app.py
-Then open: http://localhost:5000
+Run with:
+    python app.py
 
-Requires ANTHROPIC_API_KEY set in the environment (or in .env).
+Then open:
+    http://127.0.0.1:5000
 
-Modes:
-  quick  — extract_rfq only → show project details, phases, deliverables. ~20-40s.
-  full   — full pipeline: extract + research (optional) + proposal doc + fee template. ~1-2 min.
-
-Cost-saving options (set in .env):
-  TEST_MODE=1   — skips all API calls, returns a realistic fixture. Zero cost. Good for UI testing.
-  USE_HAIKU=1   — switches all models to claude-haiku-4-5 (~20x cheaper). Good for real flow testing.
+.env options:
+    TEST_MODE=1   no API calls, uses fixture data and creates test DOCX/XLSX
+    TEST_MODE=0   real API workflow
+    USE_HAIKU=1   cheaper Claude model for real testing
 """
 
 import os
 import uuid
 import traceback
-from flask import Flask, request, render_template, send_file
-from dotenv import load_dotenv
-from docx import Document
-from openpyxl import Workbook
 from datetime import datetime
 
-load_dotenv()  # loads ANTHROPIC_API_KEY and other vars from .env
+from dotenv import load_dotenv
+from flask import Flask, request, render_template, send_file
+from docx import Document
+from openpyxl import Workbook
+
+load_dotenv()
 
 TEST_MODE = os.environ.get("TEST_MODE", "0") == "1"
 USE_HAIKU = os.environ.get("USE_HAIKU", "0") == "1"
@@ -39,7 +38,8 @@ from research_site import research_site
 from generate_proposal import generate_proposal_content
 
 if TEST_MODE:
-    from test_fixture import FIXTURE_EXTRACTED, FIXTURE_ESTIMATE, FIXTURE_SECTIONS
+    from test_fixture import FIXTURE_EXTRACTED, FIXTURE_ESTIMATE
+
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
@@ -50,24 +50,16 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 app = Flask(__name__)
-app.config["MAX_CONTENT_LENGTH"] = 20 * 1024 * 1024  # 20MB
+app.config["MAX_CONTENT_LENGTH"] = 20 * 1024 * 1024
 
 
-@app.route("/", methods=["GET"])
-def index():
-    return render_template(
-        "index.html",
-        test_mode=TEST_MODE,
-        use_haiku=USE_HAIKU,
-    )
+# ---------------------------------------------------------------------
+# Test document generation
+# ---------------------------------------------------------------------
 
-
-@app.route("/process", methods=["POST"])
 def create_test_proposal_docx(extracted):
-    os.makedirs(OUTPUT_FOLDER, exist_ok=True)
-
     filename = f"TEST_Draft_Proposal_{datetime.now().strftime('%Y%m%d_%H%M%S')}.docx"
-    path = os.path.join(OUTPUT_FOLDER, filename)
+    path = os.path.join(OUTPUT_DIR, filename)
 
     doc = Document()
     doc.add_heading("Draft Proposal", level=1)
@@ -75,14 +67,16 @@ def create_test_proposal_docx(extracted):
     doc.add_heading(extracted.get("project_title", "Untitled Project"), level=2)
     doc.add_paragraph(extracted.get("background", "No background provided."))
 
-    doc.add_heading("Phases and Deliverables", level=2)
+    doc.add_heading("Site / Location", level=2)
+    doc.add_paragraph(extracted.get("site_address", "Not stated."))
 
+    doc.add_heading("Phases and Deliverables", level=2)
     for phase in extracted.get("phases", []):
         doc.add_heading(phase.get("phase_name", "Unnamed phase"), level=3)
         for item in phase.get("deliverables", []):
             doc.add_paragraph(item, style="List Bullet")
 
-    doc.add_heading("Authority Requirements", level=2)
+    doc.add_heading("Authority / Standards Requirements", level=2)
     for item in extracted.get("authority_requirements", []):
         doc.add_paragraph(item, style="List Bullet")
 
@@ -91,10 +85,8 @@ def create_test_proposal_docx(extracted):
 
 
 def create_test_fee_template(extracted):
-    os.makedirs(OUTPUT_FOLDER, exist_ok=True)
-
     filename = f"TEST_Fee_Template_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-    path = os.path.join(OUTPUT_FOLDER, filename)
+    path = os.path.join(OUTPUT_DIR, filename)
 
     wb = Workbook()
     ws = wb.active
@@ -117,10 +109,28 @@ def create_test_fee_template(extracted):
 
     wb.save(path)
     return filename
-def process():
-    mode = request.form.get("mode", "quick")  # "quick" or "full"
 
-    # ── TEST MODE — no API calls, no file needed ─────────────────────────────
+
+# ---------------------------------------------------------------------
+# Routes
+# ---------------------------------------------------------------------
+
+@app.route("/", methods=["GET"])
+def index():
+    return render_template(
+        "index.html",
+        test_mode=TEST_MODE,
+        use_haiku=USE_HAIKU,
+    )
+
+
+@app.route("/process", methods=["POST"])
+def process():
+    mode = request.form.get("mode", "quick")
+
+    # -------------------------------------------------------------
+    # TEST MODE — no API calls
+    # -------------------------------------------------------------
     if TEST_MODE:
         extracted = FIXTURE_EXTRACTED
         warnings = ["⚠️ TEST MODE — this is fixture data, not a real extraction."]
@@ -139,8 +149,10 @@ def process():
                 include_research=False,
                 test_mode=True,
             )
-docx_filename = create_test_proposal_docx(extracted)
-download_filename = create_test_fee_template(extracted)
+
+        docx_filename = create_test_proposal_docx(extracted)
+        download_filename = create_test_fee_template(extracted)
+
         return render_template(
             "result.html",
             extracted=extracted,
@@ -149,26 +161,35 @@ download_filename = create_test_fee_template(extracted)
             source_files=["test_fixture.rfq"],
             estimate_text=FIXTURE_ESTIMATE,
             quotient_url="#",
-            download_filename=None,
-            docx_filename=None,
+            download_filename=download_filename,
+            docx_filename=docx_filename,
             include_research=False,
             test_mode=True,
-            download_filename=download_filename,
-docx_filename=docx_filename,
         )
 
-    # ── NORMAL MODE — real file required ─────────────────────────────────────
-    uploaded_files = [f for f in request.files.getlist("rfq_file") if f and f.filename]
+    # -------------------------------------------------------------
+    # NORMAL MODE — real files and API
+    # -------------------------------------------------------------
+    uploaded_files = request.files.getlist("files") or request.files.getlist("rfq_file")
+    uploaded_files = [f for f in uploaded_files if f and f.filename]
+
     if not uploaded_files:
-        return render_template("index.html", error="No file selected.", test_mode=False, use_haiku=USE_HAIKU)
+        return render_template(
+            "index.html",
+            error="No file selected.",
+            test_mode=TEST_MODE,
+            use_haiku=USE_HAIKU,
+        )
 
     run_id = uuid.uuid4().hex[:8]
     text_sections = []
     skipped = []
 
     for uploaded in uploaded_files:
-        upload_path = os.path.join(UPLOAD_DIR, f"{run_id}_{uploaded.filename}")
+        safe_name = uploaded.filename.replace("/", "_").replace("\\", "_")
+        upload_path = os.path.join(UPLOAD_DIR, f"{run_id}_{safe_name}")
         uploaded.save(upload_path)
+
         try:
             file_text = extract_text(upload_path)
             text_sections.append(f"--- Source file: {uploaded.filename} ---\n{file_text}")
@@ -177,13 +198,16 @@ docx_filename=docx_filename,
         except UnsupportedFileError as e:
             skipped.append(f"{uploaded.filename}: {e}")
         except Exception:
-            skipped.append(f"{uploaded.filename}: couldn't read ({traceback.format_exc(limit=1).strip()})")
+            skipped.append(
+                f"{uploaded.filename}: couldn't read "
+                f"({traceback.format_exc(limit=1).strip()})"
+            )
 
     if not text_sections:
         return render_template(
             "index.html",
             error="None of the uploaded files could be read:\n" + "\n".join(skipped),
-            test_mode=False,
+            test_mode=TEST_MODE,
             use_haiku=USE_HAIKU,
         )
 
@@ -192,11 +216,15 @@ docx_filename=docx_filename,
     try:
         extracted = extract_rfq(combined_text)
     except Exception as e:
-        return render_template("index.html", error=f"Extraction failed: {e}", test_mode=False, use_haiku=USE_HAIKU)
+        return render_template(
+            "index.html",
+            error=f"Extraction failed: {e}",
+            test_mode=TEST_MODE,
+            use_haiku=USE_HAIKU,
+        )
 
     warnings = list(skipped)
 
-    # ── QUICK MODE ────────────────────────────────────────────────────────────
     if mode == "quick":
         return render_template(
             "result.html",
@@ -212,20 +240,27 @@ docx_filename=docx_filename,
             test_mode=False,
         )
 
-    # ── FULL MODE ─────────────────────────────────────────────────────────────
+    # -------------------------------------------------------------
+    # FULL MODE
+    # -------------------------------------------------------------
     output_filename = f"{run_id}_fee_template.xlsx"
     output_path = os.path.join(OUTPUT_DIR, output_filename)
-    fill_warnings = fill_phased_template(TEMPLATE_XLSX, output_path, extracted)
-    warnings += fill_warnings
 
-    include_research = request.form.get("include_research") == "1"
+    try:
+        fill_warnings = fill_phased_template(TEMPLATE_XLSX, output_path, extracted)
+        warnings += fill_warnings
+    except Exception as e:
+        warnings.append(f"Fee template failed to generate: {e}")
+        output_filename = None
+
+    include_research = request.form.get("include_research") in ["1", "on", "true"]
     research = None
+
     if include_research:
         try:
             research = research_site(extracted)
-            if research.get("gaps"):
-                for gap in research["gaps"]:
-                    warnings.append(f"Planning research gap: {gap}")
+            for gap in research.get("gaps", []):
+                warnings.append(f"Planning research gap: {gap}")
         except Exception as e:
             warnings.append(f"Planning research failed: {e}")
 
@@ -237,14 +272,22 @@ docx_filename=docx_filename,
 
     docx_filename = f"{run_id}_draft_proposal.docx"
     docx_path = os.path.join(OUTPUT_DIR, docx_filename)
+
     try:
         generate_draft_proposal(extracted, sections, docx_path, research)
     except Exception as e:
         warnings.append(f"Draft proposal document failed to generate: {e}")
         docx_filename = None
 
-    estimate_text = rough_fee_estimate(extracted)
-    quotient_url = build_quotient_prefill_url(extracted)
+    try:
+        estimate_text = rough_fee_estimate(extracted)
+    except Exception:
+        estimate_text = None
+
+    try:
+        quotient_url = build_quotient_prefill_url(extracted)
+    except Exception:
+        quotient_url = None
 
     return render_template(
         "result.html",
@@ -266,7 +309,7 @@ def download(filename):
     if not filename or filename == "None":
         return "No file was generated for download.", 404
 
-    path = os.path.join(OUTPUT_FOLDER, filename)
+    path = os.path.join(OUTPUT_DIR, filename)
 
     if not os.path.exists(path):
         return f"File not found: {filename}", 404
@@ -278,7 +321,9 @@ if __name__ == "__main__":
     if TEST_MODE:
         print(">>> TEST MODE ON — no API calls will be made.")
     elif USE_HAIKU:
-        print(">>> USE_HAIKU ON — using claude-haiku-4-5 (cheaper).")
+        print(">>> USE_HAIKU ON — using claude-haiku-4-5.")
+
     if not TEST_MODE and not os.environ.get("ANTHROPIC_API_KEY"):
         print("WARNING: ANTHROPIC_API_KEY is not set — extraction will fail.")
+
     app.run(debug=True, port=5000)
