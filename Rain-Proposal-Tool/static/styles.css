@@ -277,3 +277,24 @@ button:hover {
     padding: 20px;
   }
 }
+.dropzone.dragover {
+  border-color: var(--teal);
+  background: #e4f4f1;
+  transform: scale(1.01);
+}
+
+.file-list {
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.file-list li {
+  margin: 6px 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fbfcfd;
+  color: var(--text);
+  font-size: 14px;
+}

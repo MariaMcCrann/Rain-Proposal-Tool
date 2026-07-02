@@ -40,14 +40,21 @@
           <h2>Upload RFQ</h2>
           <p>PDF, Word (.docx), or .txt. You can add multiple files.</p>
 
-          <label class="dropzone">
-            <div class="upload-icon">⇧</div>
-            <strong>Click to browse files</strong>
-            <span>No file selected yet</span>
-            <input type="file" name="files" multiple accept=".pdf,.docx,.txt">
-          </label>
-        </div>
-      </section>
+         <label class="dropzone" id="dropzone">
+  <div class="upload-icon">⇧</div>
+  <strong>Drag & drop files here or click to browse</strong>
+  <span id="file-summary">No file selected yet</span>
+
+  <input
+    id="rfq-files"
+    type="file"
+    name="files"
+    multiple
+    accept=".pdf,.docx,.txt"
+  >
+</label>
+
+<ul id="file-list" class="file-list"></ul>
 
       <hr>
 
@@ -105,5 +112,50 @@
       No email, Quotient, or SharePoint connection.
     </div>
   </main>
+  <script>
+  const dropzone = document.getElementById("dropzone");
+  const fileInput = document.getElementById("rfq-files");
+  const fileSummary = document.getElementById("file-summary");
+  const fileList = document.getElementById("file-list");
+
+  function updateFileList(files) {
+    fileList.innerHTML = "";
+
+    if (!files || files.length === 0) {
+      fileSummary.textContent = "No file selected yet";
+      return;
+    }
+
+    fileSummary.textContent =
+      files.length === 1 ? files[0].name : `${files.length} files selected`;
+
+    Array.from(files).forEach(file => {
+      const li = document.createElement("li");
+      li.textContent = `✓ ${file.name}`;
+      fileList.appendChild(li);
+    });
+  }
+
+  fileInput.addEventListener("change", () => {
+    updateFileList(fileInput.files);
+  });
+
+  dropzone.addEventListener("dragover", (event) => {
+    event.preventDefault();
+    dropzone.classList.add("dragover");
+  });
+
+  dropzone.addEventListener("dragleave", () => {
+    dropzone.classList.remove("dragover");
+  });
+
+  dropzone.addEventListener("drop", (event) => {
+    event.preventDefault();
+    dropzone.classList.remove("dragover");
+
+    fileInput.files = event.dataTransfer.files;
+    updateFileList(fileInput.files);
+  });
+</script>
 </body>
 </html>
