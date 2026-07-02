@@ -1,24 +1,21 @@
-# research_engine/planning.py
+# knowledge_engine/geocode.py
 
-def get_planning_controls(location: dict) -> dict:
+def geocode_address(address: str) -> dict:
     """
     Temporary placeholder.
 
-    Later this function will connect to VicPlan / Vicmap Planning data
-    and return the actual planning scheme, zone and overlays.
+    Later this will return real coordinates and council details.
     """
 
     return {
-        "planning_scheme": None,
-        "zone": None,
-        "overlays": [],
-        "sbo": False,
-        "lsio": False,
-        "fo": False,
-        "dpo": False,
-        "source": "Placeholder",
-        "notes": [
-            "Planning controls have not been automatically checked yet.",
-            "Verify planning controls manually in VicPlan before issuing the proposal."
-        ]
+        "address": address,
+        "formatted_address": None,
+        "lat": None,
+        "lon": None,
+        "suburb": None,
+        "postcode": None,
+        "council": None,
+        "state": "VIC",
+        "country": "Australia",
+        "source": "Placeholder"
     }
