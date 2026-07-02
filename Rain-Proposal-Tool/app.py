@@ -1,16 +1,3 @@
-"""
-Run with:
-    python app.py
-
-Then open:
-    http://127.0.0.1:5000
-
-.env options:
-    TEST_MODE=1   no API calls, uses fixture data
-    TEST_MODE=0   real uploaded file workflow
-    USE_HAIKU=1   cheaper Claude model for real testing
-"""
-
 import os
 import uuid
 import traceback
@@ -53,35 +40,35 @@ app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 20 * 1024 * 1024
 
 
-# ---------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------
-
 def get_project_address(extracted: dict, combined_text: str = "") -> str:
-    """
-    Finds the best available site address from extracted RFQ data.
-    Falls back to a simple text search if the extractor did not return one.
-    """
-
-    possible_keys = [
+    keys = [
         "site_address",
         "project_address",
-        "location",
         "site_location",
+        "location",
         "address",
     ]
 
-    for key in possible_keys:
+    for key in keys:
         value = extracted.get(key)
         if value:
             return value
 
-    # Simple fallback for the Avalon style RFQ
-    text_upper = combined_text.upper()
-    if "15 AVALON ROAD" in text_upper:
+    text = combined_text.upper()
+
+    if "15 AVALON ROAD" in text:
         return "15 Avalon Road, Avalon VIC"
 
     return ""
+
+
+def get_uploaded_files():
+    uploaded_files = []
+
+    for key in request.files:
+        uploaded_files.extend(request.files.getlist(key))
+
+    return [f for f in uploaded_files if f and f.filename]
 
 
 def create_test_proposal_docx(extracted):
@@ -138,10 +125,6 @@ def create_test_fee_template(extracted):
     return filename
 
 
-# ---------------------------------------------------------------------
-# Routes
-# ---------------------------------------------------------------------
-
 @app.route("/", methods=["GET"])
 def index():
     return render_template(
@@ -156,9 +139,6 @@ def process():
     mode = request.form.get("mode", "quick")
     include_research = request.form.get("include_research") in ["1", "on", "true"]
 
-    # -------------------------------------------------------------
-    # TEST MODE
-    # -------------------------------------------------------------
     if TEST_MODE:
         extracted = FIXTURE_EXTRACTED
         warnings = ["⚠️ TEST MODE — this is fixture data, not a real extraction."]
@@ -195,16 +175,7 @@ def process():
             test_mode=True,
         )
 
-    # -------------------------------------------------------------
-    # NORMAL MODE
-    # -------------------------------------------------------------
-    uploaded_files = []
-
-    for key in request.files:
-    uploaded_files.extend(request.files.getlist(key))
-
-    uploaded_files = [f for f in uploaded_files if f and f.filename]
-
+    uploaded_files = get_uploaded_files()
 
     if not uploaded_files:
         return render_template(
@@ -225,7 +196,9 @@ def process():
 
         try:
             file_text = extract_text(upload_path)
-            text_sections.append(f"--- Source file: {uploaded.filename} ---\n{file_text}")
+            text_sections.append(
+                f"--- Source file: {uploaded.filename} ---\n{file_text}"
+            )
         except ScannedPdfError as e:
             skipped.append(f"{uploaded.filename}: {e}")
         except UnsupportedFileError as e:
@@ -257,14 +230,11 @@ def process():
         )
 
     warnings = list(skipped)
-
-    # -------------------------------------------------------------
-    # KNOWLEDGE ENGINE
-    # -------------------------------------------------------------
     research = None
-    project_address = get_project_address(extracted, combined_text)
 
     if include_research:
+        project_address = get_project_address(extracted, combined_text)
+
         if not project_address:
             warnings.append("Knowledge Engine skipped: no project address found.")
         else:
@@ -296,9 +266,6 @@ def process():
             test_mode=False,
         )
 
-    # -------------------------------------------------------------
-    # FULL MODE
-    # -------------------------------------------------------------
     output_filename = f"{run_id}_fee_template.xlsx"
     output_path = os.path.join(OUTPUT_DIR, output_filename)
 
