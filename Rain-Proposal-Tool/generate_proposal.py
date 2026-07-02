@@ -189,7 +189,7 @@ A short internal note (NOT for client): Is this proposal ready for pricing? What
 information is still missing? What should the reviewer confirm before issuing? List as bullet points."""
 
     response = client.messages.create(
-        model="claude-sonnet-4-6",
+        model=os.environ.get("RAIN_MODEL", "claude-sonnet-4-6"),
         max_tokens=8000,
         system=SYSTEM_PROMPT,
         messages=[{"role": "user", "content": user_message}],
