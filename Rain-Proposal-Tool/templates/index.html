@@ -125,27 +125,73 @@
   const fileSummary = document.getElementById("file-summary");
   const fileList = document.getElementById("file-list");
 
+  let selectedFiles = [];
+
+  function syncFileInput() {
+    const dataTransfer = new DataTransfer();
+
+    selectedFiles.forEach(file => {
+      dataTransfer.items.add(file);
+    });
+
+    fileInput.files = dataTransfer.files;
+  }
+
   function updateFileList() {
     fileList.innerHTML = "";
 
-    const files = Array.from(fileInput.files);
-
-    if (files.length === 0) {
+    if (selectedFiles.length === 0) {
       fileSummary.textContent = "No file selected yet";
       return;
     }
 
     fileSummary.textContent =
-      files.length === 1 ? files[0].name : `${files.length} files selected`;
+      selectedFiles.length === 1
+        ? selectedFiles[0].name
+        : `${selectedFiles.length} files selected`;
 
-    files.forEach(file => {
+    selectedFiles.forEach((file, index) => {
       const li = document.createElement("li");
-      li.innerHTML = `<span>✓ ${file.name}</span>`;
+
+      li.innerHTML = `
+        <span>✓ ${file.name}</span>
+        <button type="button" class="remove-file" data-index="${index}">
+          Remove
+        </button>
+      `;
+
       fileList.appendChild(li);
+    });
+
+    document.querySelectorAll(".remove-file").forEach(button => {
+      button.addEventListener("click", function () {
+        selectedFiles.splice(Number(this.dataset.index), 1);
+        syncFileInput();
+        updateFileList();
+      });
     });
   }
 
-  fileInput.addEventListener("change", updateFileList);
+  function addFiles(files) {
+    Array.from(files).forEach(file => {
+      const duplicate = selectedFiles.some(existing =>
+        existing.name === file.name &&
+        existing.size === file.size &&
+        existing.lastModified === file.lastModified
+      );
+
+      if (!duplicate) {
+        selectedFiles.push(file);
+      }
+    });
+
+    syncFileInput();
+    updateFileList();
+  }
+
+  fileInput.addEventListener("change", event => {
+    addFiles(event.target.files);
+  });
 
   dropzone.addEventListener("dragover", event => {
     event.preventDefault();
@@ -159,15 +205,7 @@
   dropzone.addEventListener("drop", event => {
     event.preventDefault();
     dropzone.classList.remove("dragover");
-
-    const dataTransfer = new DataTransfer();
-
-    Array.from(event.dataTransfer.files).forEach(file => {
-      dataTransfer.items.add(file);
-    });
-
-    fileInput.files = dataTransfer.files;
-    updateFileList();
+    addFiles(event.dataTransfer.files);
   });
 </script>
 
