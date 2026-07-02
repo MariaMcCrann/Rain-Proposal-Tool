@@ -18,6 +18,9 @@ import uuid
 import traceback
 from flask import Flask, request, render_template, send_file
 from dotenv import load_dotenv
+from docx import Document
+from openpyxl import Workbook
+from datetime import datetime
 
 load_dotenv()  # loads ANTHROPIC_API_KEY and other vars from .env
 
@@ -60,6 +63,60 @@ def index():
 
 
 @app.route("/process", methods=["POST"])
+def create_test_proposal_docx(extracted):
+    os.makedirs(OUTPUT_FOLDER, exist_ok=True)
+
+    filename = f"TEST_Draft_Proposal_{datetime.now().strftime('%Y%m%d_%H%M%S')}.docx"
+    path = os.path.join(OUTPUT_FOLDER, filename)
+
+    doc = Document()
+    doc.add_heading("Draft Proposal", level=1)
+
+    doc.add_heading(extracted.get("project_title", "Untitled Project"), level=2)
+    doc.add_paragraph(extracted.get("background", "No background provided."))
+
+    doc.add_heading("Phases and Deliverables", level=2)
+
+    for phase in extracted.get("phases", []):
+        doc.add_heading(phase.get("phase_name", "Unnamed phase"), level=3)
+        for item in phase.get("deliverables", []):
+            doc.add_paragraph(item, style="List Bullet")
+
+    doc.add_heading("Authority Requirements", level=2)
+    for item in extracted.get("authority_requirements", []):
+        doc.add_paragraph(item, style="List Bullet")
+
+    doc.save(path)
+    return filename
+
+
+def create_test_fee_template(extracted):
+    os.makedirs(OUTPUT_FOLDER, exist_ok=True)
+
+    filename = f"TEST_Fee_Template_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    path = os.path.join(OUTPUT_FOLDER, filename)
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Fee Estimate"
+
+    ws["A1"] = "RAIN Consulting - Test Fee Template"
+    ws["A3"] = "Project"
+    ws["B3"] = extracted.get("project_title", "Untitled Project")
+
+    ws["A5"] = "Phase"
+    ws["B5"] = "Hours"
+    ws["C5"] = "Fee"
+
+    row = 6
+    for phase in extracted.get("phases", []):
+        ws[f"A{row}"] = phase.get("phase_name", "Unnamed phase")
+        ws[f"B{row}"] = ""
+        ws[f"C{row}"] = ""
+        row += 1
+
+    wb.save(path)
+    return filename
 def process():
     mode = request.form.get("mode", "quick")  # "quick" or "full"
 
@@ -82,7 +139,8 @@ def process():
                 include_research=False,
                 test_mode=True,
             )
-
+docx_filename = create_test_proposal_docx(extracted)
+download_filename = create_test_fee_template(extracted)
         return render_template(
             "result.html",
             extracted=extracted,
@@ -95,6 +153,8 @@ def process():
             docx_filename=None,
             include_research=False,
             test_mode=True,
+            download_filename=download_filename,
+docx_filename=docx_filename,
         )
 
     # ── NORMAL MODE — real file required ─────────────────────────────────────
