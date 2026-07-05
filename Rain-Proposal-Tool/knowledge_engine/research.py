@@ -199,3 +199,11 @@ def research_site(text: str, extracted: Optional[Dict[str, Any]] = None) -> Dict
         "fo": "To be confirmed from VicPlan",
         "planning_source": "VicPlan / planning research",
     }
+
+def run_research(address: str) -> Dict[str, Any]:
+    """
+    Thin wrapper used by app.py's Knowledge Engine step. Takes a single
+    site address string and returns the research dictionary produced by
+    research_site().
+    """
+    return research_site(address, {"site_address": address})
