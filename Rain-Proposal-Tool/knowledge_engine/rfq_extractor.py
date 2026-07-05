@@ -126,3 +126,51 @@ def extract_rfq(file_path: str) -> Dict[str, Any]:
     }
 
     return extracted
+
+def _derive_project_title(full_text: str) -> str:
+    if not full_text:
+        return "Untitled Project"
+
+    patterns = [
+        r"(?:project\s*title|project\s*name|project)\s*[:\-]\s*(.+)",
+        r"(?:re|subject)\s*[:\-]\s*(.+)",
+    ]
+
+    for pattern in patterns:
+        match = re.search(pattern, full_text, re.IGNORECASE)
+        if match:
+            title = match.group(1).strip()
+            title = re.split(r"[\r\n]", title)[0].strip()
+            if title:
+                return title
+
+    for line in full_text.splitlines():
+        line = line.strip()
+        if line:
+            return line[:120]
+
+    return "Untitled Project"
+
+def extract_rfq_data(full_text: str) -> Dict[str, Any]:
+    """
+    Extracts RFQ fields directly from already-extracted text (e.g. text
+    already read from one or more uploaded files and combined by the
+    caller). Unlike extract_rfq(), this does not read files from disk.
+
+    Returns:
+    - full_text
+    - project_title
+    - site_address
+    - project_type
+    - scope_summary
+    """
+    project_title = _derive_project_title(full_text)
+    site_address = extract_site_address(full_text, project_title)
+
+    return {
+        "project_title": project_title,
+        "site_address": site_address,
+        "project_type": extract_project_type(full_text),
+        "scope_summary": extract_scope_summary(full_text),
+        "full_text": full_text,
+    }
