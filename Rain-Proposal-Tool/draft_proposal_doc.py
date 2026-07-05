@@ -95,6 +95,7 @@ def create_draft_proposal_doc(
 ):
     doc = Document()
     apply_document_style(doc)
+    research = research or {}
 
     project_title = extracted.get("project_title", "Draft Proposal")
     site_address = research.get("site_address") or extracted.get("site_address", "")
