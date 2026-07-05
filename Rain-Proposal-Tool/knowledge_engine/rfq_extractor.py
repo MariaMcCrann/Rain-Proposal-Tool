@@ -146,8 +146,11 @@ def _derive_project_title(full_text: str) -> str:
 
     for line in full_text.splitlines():
         line = line.strip()
-        if line:
-            return line[:120]
+        if not line:
+            continue
+        if line.startswith("--- Source file:") and line.endswith("---"):
+            continue
+        return line[:120]
 
     return "Untitled Project"
 
