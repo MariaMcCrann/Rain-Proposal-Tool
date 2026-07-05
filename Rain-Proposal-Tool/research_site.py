@@ -170,3 +170,30 @@ def _parse_research(text: str) -> dict:
             sections["gaps"].append(f"{key.replace('_', ' ').title()}: requires manual confirmation")
 
     return sections
+
+
+def extract_site_address(full_text: str, project_title: str = "") -> str:
+    """
+    Best-effort extraction of a site address from raw RFQ text.
+
+    Looks for a labelled address line (e.g. "Site Address:", "Property
+    Address:"). Returns an empty string if nothing can be found - a blank
+    address is treated downstream as "Not stated".
+    """
+    import re
+
+    if not full_text:
+        return ""
+
+    match = re.search(
+        r"(?:site|property|project)?\s*address\s*[:\-]\s*(.+)",
+        full_text,
+        re.IGNORECASE,
+    )
+    if match:
+        address = match.group(1).strip()
+        address = re.split(r"[\r\n]", address)[0].strip()
+        if address:
+            return address
+
+    return ""
