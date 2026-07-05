@@ -12,7 +12,7 @@ from openpyxl import Workbook
 from ingest import extract_text, ScannedPdfError, UnsupportedFileError
 from fill_fee_template import fill_phased_template, rough_fee_estimate
 from quotient_url import build_quotient_prefill_url
-from draft_proposal_doc import generate_draft_proposal
+from draft_proposal_doc import create_draft_proposal_doc
 
 from knowledge_engine.rfq_extractor import extract_rfq_data
 from knowledge_engine.proposal_writer import write_proposal_sections
@@ -280,7 +280,7 @@ def process():
     docx_path = os.path.join(OUTPUT_DIR, docx_filename)
 
     try:
-        generate_draft_proposal(extracted, sections, docx_path, research)
+        create_draft_proposal_doc(docx_path, extracted, research, sections)
     except Exception as e:
         warnings.append(f"Draft proposal document failed to generate: {e}")
         docx_filename = None
