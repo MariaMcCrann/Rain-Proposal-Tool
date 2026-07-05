@@ -196,4 +196,30 @@ def extract_site_address(full_text: str, project_title: str = "") -> str:
         if address:
             return address
 
+    address_match = re.search(
+        r"(?:site|property|project|subject)\s*(?:address)?\s*[:\-|]\s*(.+)",
+        full_text,
+        re.IGNORECASE,
+    )
+    if address_match:
+        address = address_match.group(1).strip()
+        address = re.split(r"[\r\n|]", address)[0].strip()
+        if address:
+            return address
+
+    street_types = (
+        r"(?:ROAD|RD|STREET|ST|AVENUE|AVE|DRIVE|DR|COURT|CT|PARADE|PDE|"
+        r"CRESCENT|CRES|LANE|LN|WAY|PLACE|PL|BOULEVARD|BLVD|HIGHWAY|HWY|"
+        r"CLOSE|CL|TERRACE|TCE)"
+    )
+    street_match = re.search(
+        r"\b\d{1,5}[A-Za-z]?\s+[A-Za-z0-9'.\-]+(?:\s+[A-Za-z0-9'.\-]+){0,3}\s+" + street_types + r"\b[,\sA-Za-z]*",
+        full_text,
+        re.IGNORECASE,
+    )
+    if street_match:
+        address = street_match.group(0).strip().rstrip(",")
+        address = re.sub(r"\s+", " ", address)
+        return address
+
     return ""
