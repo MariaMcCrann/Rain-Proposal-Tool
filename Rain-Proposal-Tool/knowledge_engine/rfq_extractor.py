@@ -172,5 +172,98 @@ def extract_rfq_data(full_text: str) -> Dict[str, Any]:
         "site_address": site_address,
         "project_type": extract_project_type(full_text),
         "scope_summary": extract_scope_summary(full_text),
+        "background": extract_background(full_text),
+        "phases": extract_phases(full_text),
+        "authority_requirements": extract_authority_requirements(full_text),
+        "contact": extract_contact(full_text),
+        "extraction_notes": [],
         "full_text": full_text,
     }
+def extract_background(full_text: str) -> str:
+    if not full_text:
+        return ""
+
+    patterns = [
+        r"(?:background|overview|project\s*background)\s*[:\-]\s*(.+?)(?:\n\s*\n|\Z)",
+    ]
+
+    for pattern in patterns:
+        match = re.search(pattern, full_text, re.IGNORECASE | re.DOTALL)
+        if match:
+            value = re.sub(r"\s+", " ", match.group(1)).strip()
+            if value:
+                return value
+
+    return ""
+
+
+def extract_authority_requirements(full_text: str) -> list:
+    if not full_text:
+        return []
+
+    keywords = [
+        "guideline", "standard", "planning scheme", "regulation",
+        "code of practice", "australian standard", "policy",
+    ]
+
+    results = []
+    for line in full_text.splitlines():
+        line_stripped = line.strip(" -\u2022\t")
+        if not line_stripped:
+            continue
+        line_l = line_stripped.lower()
+        if any(keyword in line_l for keyword in keywords):
+            if line_stripped not in results:
+                results.append(line_stripped)
+
+    return results[:10]
+
+def extract_contact(full_text: str) -> Dict[str, str]:
+    contact = {"name": "", "email": "", "phone": "", "company": ""}
+
+    if not full_text:
+        return contact
+
+    email_match = re.search(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}", full_text)
+    if email_match:
+        contact["email"] = email_match.group(0)
+
+    phone_match = re.search(r"(?:\+?\d[\d ()\-]{7,}\d)", full_text)
+    if phone_match:
+        contact["phone"] = phone_match.group(0).strip()
+
+    name_match = re.search(r"(?:contact\s*(?:name|person)?|attention)\s*[:\-]\s*(.+)", full_text, re.IGNORECASE)
+    if name_match:
+        contact["name"] = re.split(r"[\r\n]", name_match.group(1).strip())[0].strip()
+
+    company_match = re.search(r"(?:company|organisation|organization|council)\s*[:\-]\s*(.+)", full_text, re.IGNORECASE)
+    if company_match:
+        contact["company"] = re.split(r"[\r\n]", company_match.group(1).strip())[0].strip()
+
+    return contact
+
+def extract_phases(full_text: str) -> list:
+    if not full_text:
+        return []
+
+    phase_pattern = re.compile(r"phase\s*\d+[^\n]*", re.IGNORECASE)
+    matches = list(phase_pattern.finditer(full_text))
+    phases = []
+
+    for i, match in enumerate(matches):
+        start = match.end()
+        end = matches[i + 1].start() if i + 1 < len(matches) else len(full_text)
+        phase_name = match.group(0).strip(" -:\u2022\t")
+        body = full_text[start:end]
+
+        deliverables = []
+        for line in body.splitlines():
+            line_stripped = line.strip(" -\u2022\t")
+            if line_stripped:
+                deliverables.append(line_stripped)
+            if len(deliverables) >= 8:
+                break
+
+        phases.append({"phase_name": phase_name, "deliverables": deliverables})
+
+    return phases
