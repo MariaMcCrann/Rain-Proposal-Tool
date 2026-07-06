@@ -1,10 +1,11 @@
 import os
 from ingest import extract_text
 from proposal_engine_v2 import (
-    extract_rfq_data,
+    build_rfq_from_intelligence,
     research_site,
     write_proposal_sections,
     build_proposal_docx,
+
 )
 
 INPUT_FILE = "test_files/15 Avalon Rd - Hydrological Scope of Works (Phase 3 - 5) v1.pdf"
@@ -14,7 +15,7 @@ os.makedirs("outputs", exist_ok=True)
 
 text = extract_text(INPUT_FILE)
 
-rfq = extract_rfq_data(text)
+rfq = build_rfq_from_intelligence(text)
 research = research_site(rfq.site_address)
 sections = write_proposal_sections(rfq, research)
 
