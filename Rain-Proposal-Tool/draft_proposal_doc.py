@@ -102,7 +102,7 @@ def create_draft_proposal_doc(
 
     title = doc.add_paragraph()
     title.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    run = title.add_run("RAIN Consulting")
+    run = title.add_run("Engineering Services")
     run.bold = True
     run.font.size = Pt(16)
 
@@ -119,11 +119,23 @@ def create_draft_proposal_doc(
 
     doc.add_paragraph("")
 
+    project_understanding = (
+        sections.get("project_understanding")
+        or extracted.get("background")
+        or extracted.get("scope_summary")
+        or "Project understanding is to be confirmed from the RFQ before issue."
+    )
+    scope_of_services = (
+        sections.get("scope_of_services")
+        or extracted.get("scope_summary")
+        or "Scope of services is to be confirmed from the RFQ before issue."
+    )
+
     add_heading(doc, "1. Project Understanding", level=1)
-    add_paragraphs(doc, sections.get("project_understanding", ""))
+    add_paragraphs(doc, project_understanding)
 
     add_heading(doc, "2. Scope of Services", level=1)
-    add_paragraphs(doc, sections.get("scope_of_services", ""))
+    add_paragraphs(doc, scope_of_services)
 
     add_heading(doc, "3. Preliminary Site Research", level=1)
     intro = (
