@@ -8,6 +8,31 @@ def write_proposal_sections(extracted: dict, research: dict | None = None) -> di
     authorities = extracted.get("authority_requirements", [])
 
     research = research or {}
+
+    if not background:
+        background_parts = []
+        for phase in phases:
+            for item in phase.get("deliverables", []):
+                cleaned = (item or "").strip()
+                if cleaned and cleaned.lower() not in {"project background", "background"}:
+                    background_parts.append(cleaned)
+                if len(background_parts) >= 5:
+                    break
+            if len(background_parts) >= 5:
+                break
+        background = " ".join(background_parts)
+
+    scope_parts = []
+    for phase in phases:
+        phase_name = (phase.get("phase_name") or "Project phase").strip()
+        items = [str(item).strip() for item in phase.get("deliverables", []) if str(item).strip()]
+        if items:
+            scope_parts.append(phase_name + "\n" + "\n".join(f"• {item}" for item in items))
+        else:
+            scope_parts.append(phase_name)
+
+    scope_of_services = "\n\n".join(scope_parts) or extracted.get("scope_summary", "")
+
     research_authorities = research.get("authorities", {})
     planning = research.get("planning_controls", {})
 
@@ -18,7 +43,8 @@ def write_proposal_sections(extracted: dict, research: dict | None = None) -> di
             "including the nominated project background, required deliverables and approval requirements."
         ),
 
-        "project_understanding": background,
+        "project_understanding": background or extracted.get("scope_summary", ""),
+        "scope_of_services": scope_of_services,
 
         "methodology": [],
         "authority_requirements": [],
