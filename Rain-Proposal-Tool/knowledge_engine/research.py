@@ -155,6 +155,67 @@ def infer_victorian_authorities(address: str, geocode: Optional[Dict[str, Any]] 
     }
 
 
+VICMAP_PLANNING_URL = "https://services-ap1.arcgis.com/P744lA0wf4LlBZ84/ArcGIS/rest/services/Vicmap_Planning/FeatureServer"
+
+
+def query_vicmap_layer(layer_id: int, longitude: str, latitude: str) -> list:
+    if not longitude or not latitude or longitude == "Not identified" or latitude == "Not identified":
+        return []
+    try:
+        response = requests.get(
+            f"{VICMAP_PLANNING_URL}/{layer_id}/query",
+            params={
+                "geometry": f"{longitude},{latitude}",
+                "geometryType": "esriGeometryPoint",
+                "inSR": "4326",
+                "spatialRel": "esriSpatialRelIntersects",
+                "outFields": "*",
+                "returnGeometry": "false",
+                "f": "json",
+            },
+            timeout=20,
+        )
+        response.raise_for_status()
+        payload = response.json()
+        return [feature.get("attributes", {}) for feature in payload.get("features", [])]
+    except Exception:
+        return []
+
+
+def _attr(attributes: Dict[str, Any], *names: str) -> str:
+    normalised = {str(key).lower(): value for key, value in attributes.items()}
+    for name in names:
+        value = normalised.get(name.lower())
+        if value not in (None, ""):
+            return str(value)
+    return ""
+
+
+def lookup_vicmap_planning(longitude: str, latitude: str) -> Dict[str, Any]:
+    zones = query_vicmap_layer(3, longitude, latitude)
+    overlays = query_vicmap_layer(2, longitude, latitude)
+    zone_codes = sorted({
+        _attr(item, "zone_code", "scheme_code", "zone") for item in zones
+        if _attr(item, "zone_code", "scheme_code", "zone")
+    })
+    overlay_codes = sorted({
+        _attr(item, "overlay_code", "scheme_code", "overlay", "zone_code") for item in overlays
+        if _attr(item, "overlay_code", "scheme_code", "overlay", "zone_code")
+    })
+    def matching(prefix: str) -> str:
+        matches = [code for code in overlay_codes if code.upper().startswith(prefix)]
+        return ", ".join(matches) if matches else "Not mapped at query point"
+    return {
+        "zone": ", ".join(zone_codes) if zone_codes else "Vicmap query returned no zone — confirm manually",
+        "overlays": overlay_codes,
+        "dpo": matching("DPO"),
+        "sbo": matching("SBO"),
+        "lsio": matching("LSIO"),
+        "fo": matching("FO"),
+        "planning_source": "Victorian Government Vicmap Planning REST API (preliminary point query)",
+    }
+
+
 def research_site(text: str, extracted: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """
     Main function used by the proposal generator.
@@ -181,6 +242,10 @@ def research_site(text: str, extracted: Optional[Dict[str, Any]] = None) -> Dict
 
     geocode = geocode_address(site_address)
     authorities = infer_victorian_authorities(site_address, geocode)
+    planning = lookup_vicmap_planning(
+        geocode.get("longitude", ""),
+        geocode.get("latitude", ""),
+    )
 
     return {
         "site_address": site_address or "Not identified",
@@ -192,18 +257,19 @@ def research_site(text: str, extracted: Optional[Dict[str, Any]] = None) -> Dict
         "cma": authorities.get("cma") or "Not identified",
         "water_authority": authorities.get("water_authority") or "Not identified",
 
-        "zone": "To be confirmed from VicPlan",
-        "dpo": "DPO50, subject to confirmation from VicPlan",
-        "sbo": "To be confirmed from VicPlan",
-        "lsio": "To be confirmed from VicPlan",
-        "fo": "To be confirmed from VicPlan",
-        "planning_source": "VicPlan / planning research",
+        "zone": planning.get("zone", "Confirm manually"),
+        "dpo": planning.get("dpo", "Confirm manually"),
+        "sbo": planning.get("sbo", "Confirm manually"),
+        "lsio": planning.get("lsio", "Confirm manually"),
+        "fo": planning.get("fo", "Confirm manually"),
+        "overlays": planning.get("overlays", []),
+        "planning_source": planning.get("planning_source", "Vicmap Planning"),
     }
 
-def run_research(address: str) -> Dict[str, Any]:
+def run_research(address: str, full_text: str = "") -> Dict[str, Any]:
     """
     Thin wrapper used by app.py's Knowledge Engine step. Takes a single
     site address string and returns the research dictionary produced by
     research_site().
     """
-    return research_site(address, {"site_address": address})
+    return research_site(full_text or address, {"site_address": address})
