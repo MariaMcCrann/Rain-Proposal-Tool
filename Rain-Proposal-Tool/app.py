@@ -90,7 +90,7 @@ def create_test_fee_template(extracted, file_prefix):
     ws = wb.active
     ws.title = "Fee Estimate"
 
-    ws["A1"] = "RAIN Consulting - Test Fee Template"
+    ws["A1"] = "Engineering Services - Test Fee Template"
     ws["A3"] = "Project"
     ws["B3"] = extracted.get("project_title", "Untitled Project")
     ws["A4"] = "Project Number"
@@ -233,7 +233,7 @@ def process():
             warnings.append("Knowledge Engine skipped: no project address found.")
         else:
             try:
-                research = run_research(project_address)
+                research = run_research(project_address, combined_text)
 
                 print("\n=== KNOWLEDGE ENGINE RESULT ===")
                 print(research)
